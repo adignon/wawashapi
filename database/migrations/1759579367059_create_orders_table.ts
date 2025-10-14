@@ -24,9 +24,10 @@ export default class extends BaseSchema {
       table.integer("customer_order_final_price").nullable()
       table.integer("customer_fees_to_pay").nullable()
 
-      table.enum("status", ["CREATED", "STARTED", "PICKED", "WASHING", "DELIVERED", "CANCELED", "READY"]).notNullable()
+      table.enum("status", ["CREATED", "STARTED", "PICKED", "WASHING", "DELIVERED", "CANCELED", "READY","NOTEXECUTED"]).notNullable()
+      table.enum("merchant_payment_status", ["PENDING", "REVERSED"]).nullable()
       table.enum("order_type", ["SUBSCRIPTION", "COMMAND"]).notNullable()
-
+      
 
       table.integer("delivery_cost").notNullable()
       table.integer("merchant_kg_cost").notNullable()
@@ -40,6 +41,7 @@ export default class extends BaseSchema {
       table.integer("command_execution_index")
 
       table.dateTime("execution_date")
+      
       table.integer("execution_duration")
       table.json("picking_hours")
       table.dateTime("delivery_date").notNullable()

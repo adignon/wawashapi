@@ -14,11 +14,16 @@ import { createHash } from 'crypto';
 export default class OrdersController {
 
     async getOrder({ request, auth, response, i18n }: HttpContext) {
-        const order =await Order.findBy({
-            userId: auth.user!.id,
-            id: request.param("orderId")
-        })
-        if(order?.invoiceId){
+        const order = await Order.query()
+            .where("id", request.param("orderId"))
+            .if(auth.user?.role == "CLEANER", q => {
+                q.where("merchantId", auth.user!.id)
+            })
+            .if(auth.user?.role == "CLIENT", q => {
+                q.where("userId", auth.user!.id)
+            })
+            .first()
+        if (order?.invoiceId) {
             await order.load("invoice")
         }
         return order
@@ -31,13 +36,20 @@ export default class OrdersController {
         return hash.substring(0, 6).toUpperCase(); // 6-char uppercase code
     }
 
-    async getCustomerOrderHistories({ request, auth, response, i18n }: HttpContext) {
-        const orders = await Order.query().where("userId", auth.user!.id).preload("package")
-        const ordersData=[]
-        for(let order of orders){
-            let orderData=order.toJSON()
-            if(order.invoiceId){
-                orderData.invoice=await Invoice.find(order.invoiceId)
+    async getOrderHistories({ request, auth, response, i18n }: HttpContext) {
+        const orders = await Order.query()
+            .if(auth.user?.role == "CLEANER", q => {
+                q.where("merchantId", auth.user!.id)
+            })
+            .if(auth.user?.role == "CLIENT", q => {
+                q.where("userId", auth.user!.id)
+            })
+            .preload("package");
+        const ordersData = []
+        for (let order of orders) {
+            let orderData = order.toJSON()
+            if (order.invoiceId) {
+                orderData.invoice = await Invoice.find(order.invoiceId)
             }
             ordersData.push(orderData)
         }
@@ -139,45 +151,57 @@ export default class OrdersController {
         return order
     }
 
-
     async merchantEvaluateOrder({ request, i18n, response }: HttpContext) {
         let order: Order | null
         const validator = vine.compile(vine.object({
-            orderId: vine.number().exists(async (_, value) => {
-                order = await Order.findBy({ "id": value, status: "CREATED" })
+            orderId: vine.string().exists(async (_, value) => {
+                console.log(value)
+                order = await Order.findBy({ "orderId": value.replace("#", "") })
                 return !!order
             }),
             kg: vine.number(),
         }))
         const data = await request.validateUsing(validator)
+
+        if (!order!) {
+            return response.status(422).json({
+                message: i18n.t("Commande non trouvée")
+            })
+        }
         const tx = await db.transaction()
         try {
+            order.userKg = data.kg
+            order.merchantTotalCost = Decimal(order.merchantKgCost!).mul(data.kg).toNumber()
+            order.customerOrderFinalPrice = Decimal(order.customerOrderKgPrice!).mul(data.kg).add(order.deliveryCost).toNumber()
+            order.customerFeesToPay = Decimal(order.customerOrderFinalPrice).minus(order.customerOrderInitialPrice).toNumber()
+            order.totalCost = Decimal(order.deliveryCost).add(order.merchantTotalCost).toNumber()
+            order.margin = Decimal(order.customerOrderFinalPrice).minus(order.totalCost).toNumber()
+            for (let addon in order.addons) {
+                order.addons[addon].totalCost = Decimal(order.addons[addon].unitCost).mul(data.kg).toNumber()
+            }
+            let iitials = order.addons!
+            if (order.addons) {
+                order.addons = JSON.stringify(iitials) as any
+            }
 
-            order!.merchantTotalCost = Decimal(order!.merchantKgCost!).mul(data.kg).toNumber()
-            order!.customerOrderFinalPrice = Decimal(order!.customerOrderKgPrice!).mul(data.kg).add(order!.deliveryCost).toNumber()
-            order!.customerFeesToPay = Decimal(order!.customerOrderFinalPrice).minus(order!.customerOrderInitialPrice).toNumber()
-            order!.totalCost = Decimal(order!.deliveryCost).add(order!.merchantTotalCost).toNumber()
-            order!.margin = Decimal(order!.customerOrderFinalPrice).minus(order!.totalCost).toNumber()
-            for (let addon in order!.addons) {
-                order!.addons[addon].totalCost = Decimal(order!.addons[addon].unitCost).mul(data.kg).toNumber()
-            }  
-            
-            if (order!.customerFeesToPay > 0) {
-                const invoice  = await Invoice.create({
-                    amount: order!.customerFeesToPay.toString(),
-                    invoiceType:order!.commandId ? "SUBSCRIPTION_OVERWEIGHT":  "COMMAND_LAUNDRY",
+            if (order.customerFeesToPay > 0) {
+                const invoice = await Invoice.create({
+                    amount: order.customerFeesToPay.toString(),
+                    invoiceType: order.commandId ? "SUBSCRIPTION_OVERWEIGHT" : "COMMAND_LAUNDRY",
                     status: "CREATED",
-                    userId: order!.userId,
+                    userId: order.userId,
                 }, {
                     client: tx
                 })
-                order!.invoiceId=invoice.id
+                order.invoiceId = invoice.id
             }
-            await order!.useTransaction(tx)!.save()
+            await order.useTransaction(tx).save()
             await tx.commit()
-            await order!.load("package")
+            await order.load("package")
+            order.addons = iitials
             return order!
         } catch (e) {
+            console.log(e)
             return response.status(400).json({
                 message: i18n.t("Une erreur est survenue lors de la sélection de la commandes. Veuillez réssager")
             })
@@ -185,21 +209,94 @@ export default class OrdersController {
     }
 
     async merchantAcceptCommand({ request, auth, i18n, response }: HttpContext) {
-        let order: Order | null
+
         const validator = vine.compile(vine.object({
             orderId: vine.number().exists(async (_, value) => {
-                order = await Order.findBy({ "id": value, status: "CREATED" })
+                let order = await Order.findBy({ "id": value, status: "CREATED" })
                 return !!order
             }),
         }))
-        await request.validateUsing(validator)
+
+        const data = await request.validateUsing(validator)
+        let order = await Order.query()
+            .where("id", data.orderId)
+            .andWhereIn("status", ["CREATED"])
+            .first()
+        if (!order!) {
+            return response.status(422).json({
+                message: i18n.t("Commande non trouvée")
+            })
+        }
         try {
-            order!.merchantId = auth.user!.id
-            await order!.save()
+            order.merchantId = auth.user!.merchantId!
+            order.status = "WASHING"
+            order.merchantPaymentStatus = "PENDING";
+            await order.save()
             return order!
         } catch (e) {
             return response.status(400).json({
-                message: i18n.t("Une erreur est survenue lors de la sélection de la commandes. Veuillez réssager")
+                message: i18n.t("Une erreur est survenue lors de la validation de la commande. Veuillez réssager")
+            })
+        }
+    }
+
+    async merchantOrderAction({ request, auth, i18n, response }: HttpContext) {
+        const data = await request.validateUsing(vine.compile(vine.object({
+            action: vine.string().in(["WASHED", "REJECTED"]),
+            orderId: vine.number().exists(async (_, value) => {
+                let order = await Order.findBy({ "id": value, status: "WASHING" })
+                return !!order
+            }),
+        })))
+        let order = await Order.query()
+            .where("id", data.orderId)
+            .andWhere("status", "WASHING")
+            .andWhere("merchantId", auth.user!.merchantId!)
+            .first()
+        if (!order) {
+            return response.status(422).json({
+                message: i18n.t("Commande non trouvée")
+            })
+        }
+        try {
+            order.status = data.action == "WASHED" ? "READY" : "CREATED"
+            order.merchantId = data.action == "WASHED" ? order.merchantId : null
+
+            await order.save()
+        } catch (e) {
+            return response.status(400).json({
+                message: i18n.t("Une erreur est survenue lors de la mise à jour de la commande. Veuillez réssager")
+            })
+        }
+    }
+
+    async customerConfirmOrderReception({ request, auth, i18n, response }: HttpContext) {
+        const validator = vine.compile(vine.object({
+            orderId: vine.number().exists(async (_, value) => {
+                let order = await Order.findBy({ "id": value, status: "READY", userId:auth.user!.id })
+                return !!order
+            }),
+        }))
+
+        const data = await request.validateUsing(validator)
+        let order = await Order.query()
+            .where("id", data.orderId)
+            .andWhere("status", "READY")
+            .andWhere("userId", auth.user!.id)
+            .first()
+        if (!order!) {
+            return response.status(422).json({
+                message: i18n.t("Commande non trouvée")
+            })
+        }
+        try {
+            order.status = "DELIVERED"
+            await order.save()
+            return order!
+        } catch (e) {
+            console.log(e)
+            return response.status(400).json({
+                message: i18n.t("Une erreur est survenue lors de la validation de la commande. Veuillez réssager")
             })
         }
     }
@@ -214,7 +311,7 @@ export default class OrdersController {
         const tx = dtx ?? await db.transaction()
         try {
             const startDate = command.commandStartAt
-            const nextWeekPickups = this.getPickupsDates(startDate!.plus({ days: command.totalExecution * 7 })!.toJSDate(), command.pickingDaysTimes, false)
+            const nextWeekPickups = this.getPickupsDates(startDate!.plus({ days: command.totalExecution * 7 })!.toJSDate(), command.pickingDaysTimes, true)
             let i = 0
             const commandExecutionIndex = command.totalExecution + 1
             for (let pickup of nextWeekPickups) {
@@ -237,7 +334,7 @@ export default class OrdersController {
 
     getSubscriptionValidityPeriod(paymentDate: Date, pickupDays: [number, [string, string]][], deliveryDelayHours = 48) {
 
-        const nextPickupDates: Date[] = this.getPickupsDates(paymentDate, pickupDays).map(d => d[0]) as any
+        const nextPickupDates: Date[] = this.getPickupsDates(paymentDate, pickupDays, true).map(d => d[0]) as any
         const firstPickup = nextPickupDates.sort((a, b) => a.getTime() - b.getTime())[0];
         // Début d’abonnement = date du premier ramassage
         const startDate = new Date(firstPickup);
@@ -250,7 +347,7 @@ export default class OrdersController {
         return { startDate, endDate };
     }
 
-    getPickupsDates(initialDate: Date, pickupDays: [number, [string, string]][], includeToday=true) {
+    getPickupsDates(initialDate: Date, pickupDays: [number, [string, string]][], includeToday = true) {
         const today = initialDate.getDay();
 
         const pickups = pickupDays//.map(d=>d[0] == 7?0:d[0])
@@ -259,12 +356,12 @@ export default class OrdersController {
         return pickups.map(([dayIndex, hours]) => {
             let day = dayIndex == 7 ? 0 : dayIndex
             let daysToAdd = day - today;
-            if(includeToday){
+            if (includeToday) {
                 if (daysToAdd < 0) daysToAdd += 7;
-            }else{
+            } else {
                 if (daysToAdd <= 0) daysToAdd += 7;
             }
-             // prochaine semaine
+            // prochaine semaine
             const nextDate = new Date(initialDate);
             nextDate.setDate(initialDate.getDate() + daysToAdd);
             nextDate.setHours(0, 0, 0, 0);
@@ -272,6 +369,8 @@ export default class OrdersController {
             return [nextDate, dayIndex, hours];
         });
     }
+
+    
 
 
 

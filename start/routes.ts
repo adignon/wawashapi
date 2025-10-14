@@ -28,12 +28,19 @@ router.group(() => {
     router.get("/packages/:type?", [PackagesController, "getPackages"])
     router.get("/subscription/payment/:commandId", [SubscriptionController, "checkPayment"])
     router.post("/subscription/cancel", [SubscriptionController, "cancelActiveSubscription"])
-    router.get("/histories", [OrderController,"getCustomerOrderHistories"])
-    router.get("/orders/:orderId", [OrderController,"getOrder"])
+    router.get("/histories", [OrderController, "getOrderHistories"])
+    router.get("/orders/:orderId", [OrderController, "getOrder"])
+    router.post("/orders/:orderId/delivered", [OrderController, "customerConfirmOrderReception"])
     router.group(() => {
       router.post("/order/eval", [OrderController, "merchantEvaluateOrder"])
       router.post("/order/accept", [OrderController, "merchantAcceptCommand"])
-    }).prefix("merchants")
+       router.post("/order/submit", [OrderController, "merchantOrderAction"])
+    })
+      .prefix("merchants")
+      .use([
+        middleware.userIs("CLEANER")
+      ])
+
   }).use([
     middleware.auth(),
     middleware.deviceCheck({ authicationCheck: true })

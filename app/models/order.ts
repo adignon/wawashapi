@@ -103,13 +103,13 @@ export default class Order extends BaseModel {
   declare packageId: number
 
   @column()
-  declare invoiceId:number
+  declare invoiceId: number
 
-  @hasOne(()=>Invoice,{
-    foreignKey:"id",
-    localKey:"invoiceId"
+  @hasOne(() => Invoice, {
+    foreignKey: "id",
+    localKey: "invoiceId"
   })
-  declare invoice:HasOne<typeof Invoice>
+  declare invoice: HasOne<typeof Invoice>
 
   @hasOne(() => Package, {
     foreignKey: "id",
@@ -118,7 +118,10 @@ export default class Order extends BaseModel {
   declare package: HasOne<typeof Package>
 
   @column()
-  declare merchantId: number
+  declare merchantPaymentStatus?: "PENDING" | "REVERSED" | null
+
+  @column()
+  declare merchantId?: number | null
 
   @hasOne(() => Merchant, {
     foreignKey: "id",
@@ -134,7 +137,17 @@ export default class Order extends BaseModel {
 
   @computed()
   get hasStarted() {
-    return this.status == "CREATED" && this.executionDate < DateTime.now()
+    if (this.pickingHours?.length && this.executionDate) {
+      let startAt = this.executionDate.toJSDate()
+      console.log(this.pickingHours[0].split(":"))
+      const [h, m] = this.pickingHours[0].split(":")
+      return this.status == "CREATED" && DateTime.fromJSDate(startAt).plus({
+        hour: Number(h),
+        minutes: Number(m)
+      }) < DateTime.now()
+    }
+    return false
+
   }
 
 }

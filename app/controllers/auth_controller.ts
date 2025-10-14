@@ -173,7 +173,7 @@ export default class AuthController {
                 firstname: data.firstname,
                 merchantId:merchant?.id,
                 //role: "CLIENT",
-                role:"CLEANER",
+                role:merchant ? "CLEANER" : "CLIENT",
                 lastDevice: ctx.request.header("x-device-id"),
                 imageUrl: path,
                 lastname: data.lastname

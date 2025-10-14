@@ -19,6 +19,7 @@
       "pickingDate":"La date de collecte",
       "hours":"Les horaires de collecte",
       "dryingAddon":"L'option de repassage",
+      "orderId":"L'ID de la commande",
       "coord": {
         "longitude": "Votre coordonnée de localisation (Longitude)",
         "latitude": "Votre coordonnée de localisation (Latitude)"
