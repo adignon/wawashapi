@@ -11,6 +11,8 @@ import jwt from "jsonwebtoken"
 import drive from '@adonisjs/drive/services/main'
 import SubscriptionsController from './subscriptions_controller.js'
 import Merchant from '#models/merchant'
+import Config from '#models/config'
+import PaymentAccount from '#models/payment_account'
 
 export default class AuthController {
     async otpVerificationPhone({ request, i18n, response }: HttpContext) {
@@ -47,8 +49,8 @@ export default class AuthController {
                 const otpToken = jwt.sign({ phone: data.phone, deviceId: otp.deviceId }, process.env.JWT_SECRET!, {
                     expiresIn: "24h"
                 })
-                if(data.changeDevice && user){
-                    user!.lastDevice=request.header("x-device-id")!
+                if (data.changeDevice && user) {
+                    user!.lastDevice = request.header("x-device-id")!
                     await user.save()
                 }
                 await otp.save()
@@ -102,16 +104,16 @@ export default class AuthController {
             otp.verifiedAt = DateTime.now()
             otp.expirationDurationMs = 0
             await otp.save()
-            const user =await User.query().where("phone", data.phone).first();
-            const activeSubscription=user? (new SubscriptionsController()).getUserActiveSubscription(user.id):null
+            const user = await User.query().where("phone", data.phone).first();
+            const activeSubscription = user ? (new SubscriptionsController()).getUserActiveSubscription(user.id) : null
             return {
                 message: ctx.i18n.t("Otp code validé"),
                 acessToken: user ? await this.logUserIn(user, ctx) : null,
-                user:user ? {
+                user: user ? {
                     ...user?.toJSON(),
                     activeSubscription
-                }:null,
-                
+                } : null,
+
 
             }
         } catch (e) {
@@ -165,25 +167,27 @@ export default class AuthController {
                 path = "/uploads/" + filename
             }
             const merchant = await Merchant.query()
-             .whereRaw("phones LIKE ? COLLATE utf8mb4_bin", [data.phone])
-            .first()
+                .whereRaw("phones LIKE ? COLLATE utf8mb4_bin", [data.phone])
+                .first()
             const user = await User.create({
                 email: data.email,
                 phone: data.phone,
                 firstname: data.firstname,
-                merchantId:merchant?.id,
+                merchantId: merchant?.id,
                 //role: "CLIENT",
-                role:merchant ? "CLEANER" : "CLIENT",
+                role: merchant ? "CLEANER" : "CLIENT",
                 lastDevice: ctx.request.header("x-device-id"),
                 imageUrl: path,
                 lastname: data.lastname
             })
-            const activeSubscription=(new SubscriptionsController()).getUserActiveSubscription(user.id)
-            return { user:{
-                ...user.toJSON(),
-                merchant,
-                activeSubscription
-            }, acessToken: await this.logUserIn(user, ctx) }
+            const activeSubscription = (new SubscriptionsController()).getUserActiveSubscription(user.id)
+            return {
+                user: {
+                    ...user.toJSON(),
+                    merchant,
+                    activeSubscription
+                }, acessToken: await this.logUserIn(user, ctx)
+            }
         } catch (e) {
             if (filename && data.profileImage) {
                 await drive.use("fs").delete(app.makePath('storage/uploads', filename))
@@ -207,6 +211,16 @@ export default class AuthController {
         } catch (error) {
             console.error("Login error:", error);
             throw new Error("Unable to log user in");
+        }
+    }
+
+    async getBalanceMerchant({ auth }: HttpContext) {
+        const config = await Config.query().where("key", "PAYOUT_SERVICE_FEES_RATE").firstOrFail()
+        const merchant=await Merchant.find(auth.user!.merchantId)
+        return {
+            accounts:await PaymentAccount.query().where("country","BJ"),
+            balance:merchant?.balance,
+            serviceFeeRate:config.value,
         }
     }
 

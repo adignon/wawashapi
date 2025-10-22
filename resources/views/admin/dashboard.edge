@@ -1,0 +1,106 @@
+@layout.admin({ title: 'Dashboard', pageTitle: 'Dashboard' })
+  @slot('main')
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; margin-bottom: 32px;">
+      <!-- Stats Card 1 -->
+      <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; padding: 24px; color: white; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);">
+        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 16px;">
+          <div>
+            <div style="font-size: 14px; opacity: 0.9; margin-bottom: 8px;">Total Orders</div>
+            <div style="font-size: 32px; font-weight: 700;">0</div>
+          </div>
+          <div style="font-size: 40px; opacity: 0.8;">📦</div>
+        </div>
+        <div style="font-size: 12px; opacity: 0.8;">Coming soon</div>
+      </div>
+
+      <!-- Stats Card 2 -->
+      <div style="background: white; border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); border: 2px solid #e5e7eb;">
+        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 16px;">
+          <div>
+            <div style="font-size: 14px; color: #6b7280; margin-bottom: 8px;">Total Users</div>
+            <div style="font-size: 32px; font-weight: 700; color: #1f2937;">0</div>
+          </div>
+          <div style="font-size: 40px;">👤</div>
+        </div>
+        <div style="font-size: 12px; color: #10b981;">Coming soon</div>
+      </div>
+
+      <!-- Stats Card 3 -->
+      <div style="background: white; border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); border: 2px solid #e5e7eb;">
+        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 16px;">
+          <div>
+            <div style="font-size: 14px; color: #6b7280; margin-bottom: 8px;">Active Merchants</div>
+            <div style="font-size: 32px; font-weight: 700; color: #1f2937;">0</div>
+          </div>
+          <div style="font-size: 40px;">🏪</div>
+        </div>
+        <div style="font-size: 12px; color: #f59e0b;">Coming soon</div>
+      </div>
+
+      <!-- Stats Card 4 -->
+      <div style="background: white; border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); border: 2px solid #e5e7eb;">
+        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 16px;">
+          <div>
+            <div style="font-size: 14px; color: #6b7280; margin-bottom: 8px;">Revenue</div>
+            <div style="font-size: 32px; font-weight: 700; color: #1f2937;">0 FCFA</div>
+          </div>
+          <div style="font-size: 40px;">💰</div>
+        </div>
+        <div style="font-size: 12px; color: #6b7280;">Coming soon</div>
+      </div>
+    </div>
+
+    <!-- Welcome Card -->
+    <div class="card">
+      <div style="text-align: center; padding: 40px;">
+        <div style="font-size: 64px; margin-bottom: 24px;">🧺</div>
+        <h2 style="font-size: 28px; font-weight: 700; color: #1f2937; margin-bottom: 16px;">
+          Welcome to GoWash Admin Panel
+        </h2>
+        <p style="font-size: 16px; color: #6b7280; max-width: 600px; margin: 0 auto 32px;">
+          Manage your laundry service platform from this dashboard. Monitor orders, users, merchants, and system configuration.
+        </p>
+        <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+          <a href="{{ route('admin.admins.index') }}" class="btn btn-primary">
+            Manage Admins
+          </a>
+          <a href="#" class="btn btn-secondary">
+            View Orders
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Quick Actions</h2>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+        <a href="{{ route('admin.admins.create') }}" style="padding: 20px; border: 2px solid #e5e7eb; border-radius: 8px; text-decoration: none; transition: all 0.3s; display: block;" onmouseover="this.style.borderColor='#667eea'; this.style.background='#f3f4f6';" onmouseout="this.style.borderColor='#e5e7eb'; this.style.background='white';">
+          <div style="font-size: 32px; margin-bottom: 12px;">➕</div>
+          <div style="font-weight: 600; color: #1f2937; margin-bottom: 4px;">Add Admin</div>
+          <div style="font-size: 12px; color: #6b7280;">Create new administrator</div>
+        </a>
+
+        <a href="#" style="padding: 20px; border: 2px solid #e5e7eb; border-radius: 8px; text-decoration: none; transition: all 0.3s; display: block;" onmouseover="this.style.borderColor='#667eea'; this.style.background='#f3f4f6';" onmouseout="this.style.borderColor='#e5e7eb'; this.style.background='white';">
+          <div style="font-size: 32px; margin-bottom: 12px;">👥</div>
+          <div style="font-weight: 600; color: #1f2937; margin-bottom: 4px;">View Users</div>
+          <div style="font-size: 12px; color: #6b7280;">Manage customers</div>
+        </a>
+
+        <a href="#" style="padding: 20px; border: 2px solid #e5e7eb; border-radius: 8px; text-decoration: none; transition: all 0.3s; display: block;" onmouseover="this.style.borderColor='#667eea'; this.style.background='#f3f4f6';" onmouseout="this.style.borderColor='#e5e7eb'; this.style.background='white';">
+          <div style="font-size: 32px; margin-bottom: 12px;">🏪</div>
+          <div style="font-weight: 600; color: #1f2937; margin-bottom: 4px;">Merchants</div>
+          <div style="font-size: 12px; color: #6b7280;">Manage service providers</div>
+        </a>
+
+        <a href="#" style="padding: 20px; border: 2px solid #e5e7eb; border-radius: 8px; text-decoration: none; transition: all 0.3s; display: block;" onmouseover="this.style.borderColor='#667eea'; this.style.background='#f3f4f6';" onmouseout="this.style.borderColor='#e5e7eb'; this.style.background='white';">
+          <div style="font-size: 32px; margin-bottom: 12px;">⚙️</div>
+          <div style="font-weight: 600; color: #1f2937; margin-bottom: 4px;">Settings</div>
+          <div style="font-size: 12px; color: #6b7280;">Configure system</div>
+        </a>
+      </div>
+    </div>
+  @end
+@end

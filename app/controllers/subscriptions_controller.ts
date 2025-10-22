@@ -15,6 +15,7 @@ import { DateTime } from 'luxon'
 import OrdersController from './orders_controller.js'
 import Config from '#models/config'
 import Order from '#models/order'
+import PaymentAccount from '#models/payment_account'
 
 export default class SubscriptionsController {
 
@@ -129,11 +130,14 @@ export default class SubscriptionsController {
                 multiplePickingPrice = Decimal(multiplePicking!.price).mul(len).mul(4)
 
             }
-            const orderMinPrice = Decimal(Decimal(pack!.amount).add(shippingAddon!.price).add((repassageAddon?.price) ?? 0)).mul(pack!.kg).toNumber()
             const total = Decimal(pack!.amount).mul(4).add(shippingPrice).add(repassagePrice).add(multiplePickingPrice).toString()
+            const orderMinPrice = Decimal(total).div(4).toNumber()
+
             // 1. Create Invoice
+            const paymentMethodAccount = await PaymentAccount.query().andWhere("isDefault", 1).andWhere("country", "BJ").firstOrFail()
             const invoice = await Invoice.create({
                 amount: total,
+                paymentAccountId: paymentMethodAccount.id,
                 invoiceType: pack!.isSubscriptable ? "SUBSCRIPTION_LAUNDRY" : "COMMAND_LAUNDRY",
                 status: "CREATED",
                 userId: auth.user!.id,
@@ -180,10 +184,12 @@ export default class SubscriptionsController {
                     client: tx
                 })
             }
+            const url = await PaymentService.payInvoice(invoice)
 
             await tx.commit()
+
             isQuerySaved = true
-            const url = await PaymentService.payInvoice(invoice)
+
             await command.load("invoice")
             return response.json({
                 message: i18n.t('Commande créée avec succès.'),
@@ -291,20 +297,7 @@ export default class SubscriptionsController {
             order.orderId = OrdersController.getOrderId(order.id)
             await order.save()
 
-
-            // To remove
-            const invoice = await Invoice.create({
-                amount: "1000",
-                invoiceType: "COMMAND_LAUNDRY",
-                status: "CREATED",
-                userId: order!.userId,
-            })
-            order.invoiceId = invoice.id
-            await order.load("invoice")
-            await order.save()
-            // To remove -- end
-            
-            order.pickingHours=data.hours
+            order.pickingHours = data.hours
             return order
         } catch (e) {
 
@@ -343,12 +336,11 @@ export default class SubscriptionsController {
 
     async checkPayment({ request, auth, response, i18n }: HttpContext) {
         try {
-            const commandId = request.param("commandId")
-            let command: Command | null
-            if (!(commandId && (command = await Command.query().where("id", commandId).andWhere("userId", auth.user!.id).preload("invoice").preload("package").first()))) {
-                return response.status(400).json({
+            const command = await Command.query().where("id", request.param("commandId")).andWhere("userId", auth.user!.id).preload("invoice").preload("package").first()
+            if (!command) {
+                throw {
                     message: i18n.t("Identifiant invalide. Commande non trouvée")
-                })
+                }
             } else if (command.isPaid && command.startAt) {
                 return {
                     command
@@ -358,9 +350,6 @@ export default class SubscriptionsController {
             await PaymentService.verifyInvoice(command.invoice)
             if (command.invoice.status == "SUCCESS") {
                 await this.handlePaidCommand(command)
-                await command.refresh()
-                const orderController = new OrdersController()
-                await orderController.processNextCommandOrders(command)
                 return {
                     command,
                 }
@@ -375,32 +364,17 @@ export default class SubscriptionsController {
                 }
             }
         } catch (e) {
-            console.log(e)
-            return response.status(400).json({
-                message: i18n.t("Une erreur est survenue lors de l'envoie du push à nouveau")
-            })
-        }
-    }
-
-    async handleCommandPayment({ request, auth, response, i18n }: HttpContext) {
-
-        try {
-            const commandId = request.param("commandId")
-            let command: Command | null
-            if (!(commandId && (command = await Command.query().where("id", commandId).andWhere("userId", auth.user!.id).first()))) {
+            if (e.error) {
                 return response.status(400).json({
-                    message: i18n.t("Identifiant invalide. Commande non trouvée")
+                    message: e.error
                 })
             }
-            await this.handlePaidCommand(command)
-            return response.status(200)
-        } catch (e) {
-            logger.error(e)
             return response.status(400).json({
                 message: i18n.t("Une erreur est survenue lors de l'envoie du push à nouveau")
             })
         }
     }
+
 
     async handlePaidCommand(command: Command) {
         const trx = await db.transaction()
@@ -424,6 +398,10 @@ export default class SubscriptionsController {
             }
 
             await trx.commit()
+            await command.refresh()
+            const orderController = new OrdersController()
+            await orderController.processNextCommandOrders(command)
+            return command
         } catch (err) {
             await trx.rollback()
             throw err

@@ -10,6 +10,7 @@ import { Decimal } from 'decimal.js';
 import env from '#start/env';
 import Invoice from '#models/invoice';
 import { createHash } from 'crypto';
+import PaymentAccount from '#models/payment_account';
 
 export default class OrdersController {
 
@@ -17,7 +18,7 @@ export default class OrdersController {
         const order = await Order.query()
             .where("id", request.param("orderId"))
             .if(auth.user?.role == "CLEANER", q => {
-                q.where("merchantId", auth.user!.id)
+                q.where("merchantId", auth.user!.merchantId!)
             })
             .if(auth.user?.role == "CLIENT", q => {
                 q.where("userId", auth.user!.id)
@@ -32,14 +33,14 @@ export default class OrdersController {
     static getOrderId(id: number) {
         const salt = env.get("APP_KEY");
         const input = salt + id;
-        const hash = createHash("sha256").update(input).digest("base64url");
-        return hash.substring(0, 6).toUpperCase(); // 6-char uppercase code
+        const hash = createHash("sha256").update(input).digest("hex");
+        return hash.substring(hash.length-1, 6).toUpperCase(); // 6-char uppercase code
     }
 
     async getOrderHistories({ request, auth, response, i18n }: HttpContext) {
         const orders = await Order.query()
             .if(auth.user?.role == "CLEANER", q => {
-                q.where("merchantId", auth.user!.id)
+                q.where("merchantId", auth.user!.merchantId!)
             })
             .if(auth.user?.role == "CLIENT", q => {
                 q.where("userId", auth.user!.id)
@@ -67,13 +68,15 @@ export default class OrdersController {
         var orderShippingType: string | null = null
         var deliveryCost = command.deliveryPerDayCost
         var addonsKgCost = 0
+        var addonsTotalKgCost = 0
         var merchantCosts: any = {}
         command.addons.forEach((addon) => {
             switch (addon.key) {
                 case "SHIPPING": {
                     orderShippingDuration = Number(addon.value.timeDurationApprox)
                     orderShippingType = addon.code
-                    addonsKgCost += Number(addon.price)
+                    addonsTotalKgCost+= Decimal(addon.price).mul(command.package.kg).toNumber()
+                    addonsKgCost += Decimal(addon.price).toNumber()
                     merchantCosts["SHIPPING"] = {
                         unitCost: addon.value.merchantCost,
                         totalCost: 0
@@ -82,7 +85,8 @@ export default class OrdersController {
                     break;
                 }
                 case "REPASSAGE": {
-                    addonsKgCost += Number(addon.price)
+                    addonsTotalKgCost+= Decimal(addon.price).mul(command.package.kg).toNumber()
+                    addonsKgCost += Decimal(addon.price).toNumber()
                     merchantCosts["REPASSAGE"] = {
                         unitCost: addon.value.merchantCost,
                         totalCost: 0
@@ -110,7 +114,7 @@ export default class OrdersController {
         // Prix d'exécution de la commande
         // Niveau d'exécution actuelle de l'ordre
         // status
-        const customerKgPrice = Decimal(command.package.amount).add(addonsKgCost).toNumber()
+        const customerKgPrice = Decimal(command.package.amount).add(addonsKgCost).div(command.package.kg).toNumber()
         const customerOrderInitialPrice = Decimal(customerKgPrice).mul(command.package.kg).toNumber()
         if (!Decimal(customerOrderInitialPrice).eq(command.orderMinPrice)) {
             throw Error("Le prix unitaire par commande est différent. Prix unitaire de l'ordre initial:" + command.orderMinPrice + ", Prix unitaire de l'ordre pendant execution: " + customerOrderInitialPrice)
@@ -155,8 +159,7 @@ export default class OrdersController {
         let order: Order | null
         const validator = vine.compile(vine.object({
             orderId: vine.string().exists(async (_, value) => {
-                console.log(value)
-                order = await Order.findBy({ "orderId": value.replace("#", "") })
+                order = await Order.findBy({ "orderId": value.replace("#", ""), status: "CREATED"})
                 return !!order
             }),
             kg: vine.number(),
@@ -172,7 +175,7 @@ export default class OrdersController {
         try {
             order.userKg = data.kg
             order.merchantTotalCost = Decimal(order.merchantKgCost!).mul(data.kg).toNumber()
-            order.customerOrderFinalPrice = Decimal(order.customerOrderKgPrice!).mul(data.kg).add(order.deliveryCost).toNumber()
+            order.customerOrderFinalPrice = Decimal(order.customerOrderKgPrice!).mul(data.kg).add(order.commandId ? 0 :order.deliveryCost ).toNumber()
             order.customerFeesToPay = Decimal(order.customerOrderFinalPrice).minus(order.customerOrderInitialPrice).toNumber()
             order.totalCost = Decimal(order.deliveryCost).add(order.merchantTotalCost).toNumber()
             order.margin = Decimal(order.customerOrderFinalPrice).minus(order.totalCost).toNumber()
@@ -183,13 +186,15 @@ export default class OrdersController {
             if (order.addons) {
                 order.addons = JSON.stringify(iitials) as any
             }
-
+            
             if (order.customerFeesToPay > 0) {
+                const paymentMethodAccount = await PaymentAccount.query().andWhere("isDefault", 1).andWhere("country", "BJ").firstOrFail()
                 const invoice = await Invoice.create({
                     amount: order.customerFeesToPay.toString(),
                     invoiceType: order.commandId ? "SUBSCRIPTION_OVERWEIGHT" : "COMMAND_LAUNDRY",
                     status: "CREATED",
                     userId: order.userId,
+                    paymentAccountId:paymentMethodAccount.id
                 }, {
                     client: tx
                 })
@@ -261,7 +266,7 @@ export default class OrdersController {
         try {
             order.status = data.action == "WASHED" ? "READY" : "CREATED"
             order.merchantId = data.action == "WASHED" ? order.merchantId : null
-
+            
             await order.save()
         } catch (e) {
             return response.status(400).json({
@@ -291,6 +296,7 @@ export default class OrdersController {
         }
         try {
             order.status = "DELIVERED"
+            order.merchantPaymentStatus="REVERSED"
             await order.save()
             return order!
         } catch (e) {

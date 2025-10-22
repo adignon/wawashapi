@@ -10,6 +10,7 @@ export default class extends BaseSchema {
       table.string('firstname').notNullable()
       table.string('email', 254).notNullable().unique()
       table.string('phone', 20).notNullable().unique()
+      table.string('otp_hash').nullable()
       table.string('image_url').notNullable()
       table.string('role').notNullable().checkIn(["CLIENT","CLEANER","ADMIN"])
       table.string('last_device').nullable().unique()

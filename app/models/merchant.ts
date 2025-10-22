@@ -13,6 +13,9 @@ export default class Merchant extends BaseModel {
   @column()
   declare balance:number
 
+    @column()
+  declare frozenBalance:number
+
   @column({
     prepare: (value: any) => {
       if (typeof (value) == "string") return value

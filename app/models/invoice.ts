@@ -2,6 +2,7 @@ import { DateTime } from 'luxon'
 import { BaseModel, column, hasOne } from '@adonisjs/lucid/orm'
 import User from './user.js'
 import { type HasOne } from '@adonisjs/lucid/types/relations'
+import PaymentAccount from './payment_account.js'
 
 export default class Invoice extends BaseModel {
   @column({ isPrimary: true })
@@ -14,13 +15,24 @@ export default class Invoice extends BaseModel {
   declare amount: string
 
   @column.dateTime()
-  declare paidAt?:DateTime
+  declare paidAt?: DateTime
 
   @column()
   declare paymentHash: string
 
   @column()
   declare status: "CREATED" | "PENDING" | "SUCCESS" | "FAILED"
+
+
+  @column()
+  declare paymentAccountId: number
+
+  @hasOne(() => PaymentAccount, {
+    foreignKey: "id",
+    localKey: "paymentAccountId"
+  })
+  declare paymentAccount: HasOne<typeof PaymentAccount>
+
 
   @column()
   declare userId: number

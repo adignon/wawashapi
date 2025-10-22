@@ -43,7 +43,7 @@ export default class Order extends BaseModel {
   declare addons?: { [x: string]: { unitCost: number, totalCost: number } }
 
   @column()
-  declare merchantKgCost?: number
+  declare merchantKgCost: number
 
   @column()
   declare deliveryCost: number
@@ -139,7 +139,6 @@ export default class Order extends BaseModel {
   get hasStarted() {
     if (this.pickingHours?.length && this.executionDate) {
       let startAt = this.executionDate.toJSDate()
-      console.log(this.pickingHours[0].split(":"))
       const [h, m] = this.pickingHours[0].split(":")
       return this.status == "CREATED" && DateTime.fromJSDate(startAt).plus({
         hour: Number(h),

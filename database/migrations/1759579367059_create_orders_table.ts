@@ -29,12 +29,12 @@ export default class extends BaseSchema {
       table.enum("order_type", ["SUBSCRIPTION", "COMMAND"]).notNullable()
       
 
-      table.integer("delivery_cost").notNullable()
-      table.integer("merchant_kg_cost").notNullable()
-      table.integer("merchant_total_cost").nullable()
+      table.decimal("delivery_cost", 18,2).notNullable()
+      table.decimal("merchant_kg_cost", 18,2).notNullable()
+      table.decimal("merchant_total_cost", 18,2).nullable()
 
-      table.integer("total_cost").nullable()
-      table.integer("margin").defaultTo(0)
+      table.decimal("total_cost", 18,2).nullable()
+      table.decimal("margin", 18,2).defaultTo(0)
 
 
       table.integer("order_execution_index")

@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ title || 'GoWash Admin' }}</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: #f3f4f6;
+      color: #1f2937;
+    }
+
+    .admin-wrapper {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 260px;
+      background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      position: fixed;
+      height: 100vh;
+      overflow-y: auto;
+      box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+      transition: all 0.3s;
+    }
+
+    .sidebar-header {
+      padding: 24px 20px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .sidebar-logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 24px;
+      font-weight: 700;
+      text-decoration: none;
+      color: white;
+    }
+
+    .sidebar-menu {
+      padding: 20px 0;
+    }
+
+    .menu-section {
+      margin-bottom: 24px;
+    }
+
+    .menu-section-title {
+      padding: 8px 20px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.6);
+      letter-spacing: 0.5px;
+    }
+
+    .menu-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 20px;
+      color: rgba(255, 255, 255, 0.9);
+      text-decoration: none;
+      transition: all 0.3s;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .menu-item:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+    }
+
+    .menu-item.active {
+      background: rgba(255, 255, 255, 0.15);
+      color: white;
+      border-left: 4px solid white;
+      padding-left: 16px;
+    }
+
+    .menu-icon {
+      font-size: 20px;
+      width: 24px;
+      text-align: center;
+    }
+
+    .sidebar-footer {
+      position: absolute;
+      bottom: 0;
+      width: 100%;
+      padding: 20px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .user-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 16px;
+    }
+
+    .user-details {
+      flex: 1;
+    }
+
+    .user-name {
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .user-role {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    .logout-btn {
+      width: 100%;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: white;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      transition: all 0.3s;
+      text-align: center;
+      text-decoration: none;
+      display: block;
+    }
+
+    .logout-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    /* Main Content */
+    .main-content {
+      flex: 1;
+      margin-left: 260px;
+      transition: all 0.3s;
+    }
+
+    .topbar {
+      background: white;
+      padding: 16px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .topbar-title {
+      font-size: 24px;
+      font-weight: 700;
+      color: #1f2937;
+    }
+
+    .topbar-actions {
+      display: flex;
+      gap: 12px;
+    }
+
+    .content-wrapper {
+      padding: 32px;
+    }
+
+    /* Cards */
+    .card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .card-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #1f2937;
+    }
+
+    /* Buttons */
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-secondary {
+      background: #e5e7eb;
+      color: #374151;
+    }
+
+    .btn-secondary:hover {
+      background: #d1d5db;
+    }
+
+    .btn-danger {
+      background: #ef4444;
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #dc2626;
+    }
+
+    .btn-sm {
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+
+    /* Alerts */
+    .alert {
+      padding: 16px;
+      border-radius: 8px;
+      margin-bottom: 24px;
+      font-size: 14px;
+    }
+
+    .alert-success {
+      background-color: #d1fae5;
+      color: #065f46;
+      border: 1px solid #a7f3d0;
+    }
+
+    .alert-error {
+      background-color: #fee2e2;
+      color: #991b1b;
+      border: 1px solid #fecaca;
+    }
+
+    .alert-info {
+      background-color: #dbeafe;
+      color: #1e40af;
+      border: 1px solid #bfdbfe;
+    }
+
+    /* Mobile */
+    @media (max-width: 768px) {
+      .sidebar {
+        width: 0;
+        overflow: hidden;
+      }
+
+      .main-content {
+        margin-left: 0;
+      }
+
+      .content-wrapper {
+        padding: 16px;
+      }
+
+      .topbar {
+        padding: 16px;
+      }
+    }
+  </style>
+  @if($slots.styles)
+    {{{ await $slots.styles() }}}
+  @end
+</head>
+<body>
+  <div class="admin-wrapper">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <a href="{{ route('admin.dashboard') }}" class="sidebar-logo">
+          <span>🧺</span>
+          <span>GoWash</span>
+        </a>
+      </div>
+
+      <nav class="sidebar-menu">
+        <div class="menu-section">
+          <div class="menu-section-title">Main</div>
+          <a href="{{ route('admin.dashboard') }}" class="menu-item {{ request.url().includes('/admin/dashboard') ? 'active' : '' }}">
+            <span class="menu-icon">📊</span>
+            <span>Dashboard</span>
+          </a>
+        </div>
+
+        <div class="menu-section">
+          <div class="menu-section-title">Management</div>
+          <a href="{{ route('admin.admins.index') }}" class="menu-item {{ request.url().includes('/admin/admins') ? 'active' : '' }}">
+            <span class="menu-icon">👥</span>
+            <span>Admins</span>
+          </a>
+          <a href="{{ route('admin.subscriptions.index') }}" class="menu-item {{ request.url().includes('/admin/subscriptions') ? 'active' : '' }}">
+            <span class="menu-icon">📋</span>
+            <span>Subscriptions</span>
+          </a>
+          <a href="{{ route('admin.orders.index') }}" class="menu-item {{ request.url().includes('/admin/orders') ? 'active' : '' }}">
+            <span class="menu-icon">📦</span>
+            <span>Orders</span>
+          </a>
+          <a href="#" class="menu-item">
+            <span class="menu-icon">👤</span>
+            <span>Users</span>
+          </a>
+          <a href="#" class="menu-item">
+            <span class="menu-icon">🏪</span>
+            <span>Merchants</span>
+          </a>
+        </div>
+
+        <div class="menu-section">
+          <div class="menu-section-title">Settings</div>
+          <a href="{{ route('admin.packages.index') }}" class="menu-item {{ request.url().includes('/admin/packages') ? 'active' : '' }}">
+            <span class="menu-icon">📦</span>
+            <span>Packages</span>
+          </a>
+          <a href="{{ route('admin.config.index') }}" class="menu-item {{ request.url().includes('/admin/config') ? 'active' : '' }}">
+            <span class="menu-icon">⚙️</span>
+            <span>Configuration</span>
+          </a>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-info">
+          <div class="user-avatar">
+            {{ auth.use('web').user.firstname ? auth.use('web').user.firstname.charAt(0).toUpperCase() : 'A' }}
+          </div>
+          <div class="user-details">
+            <div class="user-name">{{ auth.use('web').user.firstname || 'Admin' }}</div>
+            <div class="user-role">Administrator</div>
+          </div>
+        </div>
+        <form action="{{ route('admin.logout') }}" method="POST">
+          <button type="submit" class="logout-btn">Logout</button>
+        </form>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <div class="topbar">
+        <h1 class="topbar-title">{{ pageTitle || 'Dashboard' }}</h1>
+        <div class="topbar-actions">
+          @if($slots.topbarActions)
+            {{{ await $slots.topbarActions() }}}
+          @end
+        </div>
+      </div>
+
+      <div class="content-wrapper">
+        @flashMessage('success')
+          <div class="alert alert-success">
+            {{ $message }}
+          </div>
+        @end
+
+        @flashMessage('error')
+          <div class="alert alert-error">
+            {{ $message }}
+          </div>
+        @end
+
+        {{{ await $slots.main() }}}
+      </div>
+    </main>
+  </div>
+  @if($slots.scripts)
+    {{{ await $slots.scripts() }}}
+  @end
+</body>
+</html>
